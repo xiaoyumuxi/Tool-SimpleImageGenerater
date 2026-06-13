@@ -292,6 +292,45 @@ def maybe_add_env(payload: dict[str, Any], payload_key: str, env_name: str) -> N
         payload[payload_key] = value
 
 
+def build_generation_payload(model: str, prompt: str) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": model,
+        "prompt": prompt.strip(),
+        "size": os.environ.get("IMAGE_SIZE", "1024x1024"),
+        "n": int(os.environ.get("IMAGE_N", "1")),
+    }
+
+    maybe_add_env(payload, "quality", "IMAGE_QUALITY")
+    maybe_add_env(payload, "background", "IMAGE_BACKGROUND")
+    maybe_add_env(payload, "output_format", "IMAGE_OUTPUT_FORMAT")
+    maybe_add_env(payload, "response_format", "IMAGE_RESPONSE_FORMAT")
+    output_compression = os.environ.get("IMAGE_OUTPUT_COMPRESSION", "").strip()
+    if output_compression:
+        payload["output_compression"] = int(output_compression)
+    return payload
+
+
+def generate_images_with_payload(
+    base_url: str,
+    api_key: str,
+    payload: dict[str, Any],
+    output_dir: Path | None = None,
+) -> list[Path]:
+    response = request_json("POST", f"{base_url}/images/generations", api_key, payload)
+    resolved_output_dir = output_dir or Path(os.environ.get("OUTPUT_DIR", "outputs")).expanduser()
+    return save_images(response, resolved_output_dir, payload["prompt"])
+
+
+def generate_images(prompt: str, output_dir: Path | None = None) -> tuple[str, dict[str, Any], list[Path]]:
+    load_dotenv(ROOT / ".env")
+    api_key = env_required("OPENAI_API_KEY")
+    base_url = normalize_base_url(env_required("OPENAI_BASE_URL"))
+    model, _model_ids = choose_model(base_url, api_key)
+    payload = build_generation_payload(model, prompt)
+    saved = generate_images_with_payload(base_url, api_key, payload, output_dir)
+    return model, payload, saved
+
+
 def main() -> int:
     args = parse_args()
     load_dotenv(ROOT / ".env")
@@ -308,20 +347,7 @@ def main() -> int:
             print(model_id)
         return 0
 
-    payload: dict[str, Any] = {
-        "model": model,
-        "prompt": (args.prompt or PROMPT).strip(),
-        "size": os.environ.get("IMAGE_SIZE", "1024x1024"),
-        "n": int(os.environ.get("IMAGE_N", "1")),
-    }
-
-    maybe_add_env(payload, "quality", "IMAGE_QUALITY")
-    maybe_add_env(payload, "background", "IMAGE_BACKGROUND")
-    maybe_add_env(payload, "output_format", "IMAGE_OUTPUT_FORMAT")
-    maybe_add_env(payload, "response_format", "IMAGE_RESPONSE_FORMAT")
-    output_compression = os.environ.get("IMAGE_OUTPUT_COMPRESSION", "").strip()
-    if output_compression:
-        payload["output_compression"] = int(output_compression)
+    payload = build_generation_payload(model, args.prompt or PROMPT)
 
     if args.dry_run:
         print(json.dumps({"url": f"{base_url}/images/generations", "payload": payload}, ensure_ascii=False, indent=2))
@@ -337,8 +363,10 @@ def main() -> int:
 
 # Edit the prompt here. The script intentionally reads the prompt from this block.
 PROMPT = """
-A cinematic product-style image of a compact transparent cyberpunk music player
-on a clean desk, soft studio lighting, crisp details, premium industrial design.
+**[待补图]** 图名：四种编码示意图对比
+
+- 图要表达的内容：一张图里把 Binary / Value / Permutation / Tree 四种染色体形状直观放一起
+- 建议来源：PPT P7–P14 截图拼接
 """
 
 

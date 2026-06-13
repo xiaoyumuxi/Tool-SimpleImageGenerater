@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Image 2 Studio</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div>
+            <p>Image 2</p>
+            <h1>Prompt Studio</h1>
+          </div>
+          <button id="newConversationBtn" class="icon-btn" title="新建对话">+</button>
+        </div>
+        <div class="search-wrap">
+          <input id="searchInput" type="search" placeholder="搜索对话" />
+        </div>
+        <nav id="conversationList" class="conversation-list"></nav>
+        <button id="archiveBtn" class="archive-btn">查看归档</button>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <input id="titleInput" class="title-input" placeholder="未选择对话" />
+          <div class="topbar-actions">
+            <button id="saveTitleBtn">保存标题</button>
+            <button id="archiveConversationBtn" class="danger">归档对话</button>
+          </div>
+        </header>
+
+        <section id="messages" class="messages empty">
+          <div class="empty-state">
+            <span>IMG</span>
+            <h2>新建一个对话，然后发送提示词。</h2>
+          </div>
+        </section>
+
+        <section class="composer">
+          <textarea id="promptInput" placeholder="输入或粘贴你的生成提示词"></textarea>
+          <div class="composer-footer">
+            <div id="statusText" class="status">Ready</div>
+            <button id="sendBtn" class="primary">生成图片</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="archiveDialog">
+      <div class="dialog-head">
+        <h2>归档</h2>
+        <button id="closeArchiveBtn" class="icon-btn" title="关闭">×</button>
+      </div>
+      <div id="archiveContent" class="archive-content"></div>
+    </dialog>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

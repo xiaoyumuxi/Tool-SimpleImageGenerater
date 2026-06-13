@@ -3,4 +3,11 @@
 .uv-cache/
 __pycache__/
 outputs/
+*.sqlite3
+*.sqlite3-*
 *.pyc
+.DS_Store
+.idea/
+.vscode/
+*.log
+

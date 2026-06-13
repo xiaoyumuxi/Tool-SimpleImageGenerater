@@ -47,3 +47,21 @@ UV_CACHE_DIR=.uv-cache uv run python image2_generate.py --list-models
 ```
 
 Edit the image prompt at the bottom of `image2_generate.py`.
+
+## Web UI
+
+Start the local app:
+
+```bash
+UV_CACHE_DIR=.uv-cache uv run python web_app.py
+```
+
+Then open:
+
+```text
+http://127.0.0.1:3000
+```
+
+The web UI lets you create conversations, edit prompts/messages, send image generation requests, render finished images directly in the page, rename conversations, search history, and archive conversations/messages. Archive actions copy rows into SQLite archive tables before removing them from the active tables.
+
+Data is stored in `image_history.sqlite3`. Generated files still go to `OUTPUT_DIR` from `.env` (`outputs` by default).
