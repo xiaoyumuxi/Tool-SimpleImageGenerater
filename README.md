@@ -18,15 +18,24 @@ Optional values:
 ```dotenv
 IMAGE_SIZE=1024x1024
 IMAGE_N=1
+IMAGE_QUALITY=medium
 OUTPUT_DIR=outputs
 OPENAI_IMAGE_MODEL=gpt-image-1
 ```
 
 `OPENAI_IMAGE_MODEL` is only used as a fallback when `GET /models` does not contain an `image-2`-like model.
+`IMAGE_QUALITY`, `IMAGE_OUTPUT_FORMAT`, `IMAGE_BACKGROUND`, and `IMAGE_OUTPUT_COMPRESSION` are passed through when set.
+
+Some relay providers block Python's default HTTP/TLS fingerprint. This project uses `curl_cffi` by default after `uv sync`, with browser-like headers. To force the standard-library client for debugging:
+
+```dotenv
+IMAGE_HTTP_CLIENT=urllib
+```
 
 ## Run
 
 ```bash
+UV_CACHE_DIR=.uv-cache uv sync
 UV_CACHE_DIR=.uv-cache uv run python image2_generate.py --dry-run
 UV_CACHE_DIR=.uv-cache uv run python image2_generate.py
 ```

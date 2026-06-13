@@ -12,10 +12,22 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
+
+try:
+    from curl_cffi import requests as curl_requests
+except ImportError:  # Optional dependency; urllib fallback keeps dry-run/list-models usable.
+    curl_requests = None
 
 
 ROOT = Path.cwd()
+DEFAULT_BROWSER_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/125.0.0.0 Safari/537.36"
+)
+CurlMethod = Literal["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE", "PATCH", "QUERY"]
+ALLOWED_CURL_METHODS: set[str] = {"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE", "PATCH", "QUERY"}
 
 
 def load_dotenv(path: Path) -> None:
@@ -62,17 +74,70 @@ def normalize_base_url(base_url: str) -> str:
     return cleaned
 
 
+def api_headers(api_key: str) -> dict[str, str]:
+    origin = os.environ.get("OPENAI_RELAY_ORIGIN", "").strip()
+    referer = os.environ.get("OPENAI_RELAY_REFERER", "").strip()
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        "User-Agent": os.environ.get("IMAGE_USER_AGENT", DEFAULT_BROWSER_UA),
+        "Origin": origin or "https://api.55.al",
+        "Referer": referer or "https://api.55.al/",
+    }
+    return {key: value for key, value in headers.items() if value}
+
+
+def read_http_error_body(body: str, status: int, method: str, url: str) -> RuntimeError:
+    hint = ""
+    if status == 403 and "browser's signature" in body:
+        hint = (
+            "\nHint: the relay blocked this request by browser/TLS fingerprint. "
+            "Install dependencies with `uv sync` so the script can use curl_cffi, "
+            "or set IMAGE_HTTP_CLIENT=urllib to force the standard-library client."
+        )
+    return RuntimeError(f"{method} {url} failed with HTTP {status}: {body}{hint}")
+
+
+def curl_method(method: str) -> CurlMethod:
+    normalized = method.upper()
+    if normalized not in ALLOWED_CURL_METHODS:
+        raise ValueError(f"Unsupported HTTP method for curl_cffi: {method}")
+    return cast(CurlMethod, normalized)
+
+
+def browser_impersonate() -> Any:
+    return os.environ.get("IMAGE_BROWSER_IMPERSONATE", "chrome120")
+
+
 def request_json(method: str, url: str, api_key: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    if curl_requests is not None and os.environ.get("IMAGE_HTTP_CLIENT", "curl_cffi") != "urllib":
+        try:
+            response = curl_requests.request(
+                curl_method(method),
+                url,
+                headers=api_headers(api_key),
+                json=payload,
+                timeout=180,
+                impersonate=browser_impersonate(),
+            )
+        except Exception as exc:
+            raise RuntimeError(f"{method} {url} failed: {exc}") from exc
+
+        if response.status_code >= 400:
+            raise read_http_error_body(response.text, response.status_code, method, url)
+
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise RuntimeError(f"{method} {url} returned non-JSON response: {response.text[:1000]}") from exc
+
     data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(
         url,
         data=data,
         method=method,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
+        headers=api_headers(api_key),
     )
 
     try:
@@ -81,7 +146,7 @@ def request_json(method: str, url: str, api_key: str, payload: dict[str, Any] | 
             return json.loads(body)
     except urllib.error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"{method} {url} failed with HTTP {exc.code}: {details}") from exc
+        raise read_http_error_body(details, exc.code, method, url) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"{method} {url} failed: {exc.reason}") from exc
 
@@ -179,7 +244,7 @@ def infer_extension(url: str, content_type: str | None) -> str:
 
 
 def download_image(url: str) -> tuple[bytes, str]:
-    request = urllib.request.Request(url, headers={"User-Agent": "image2-generate/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": os.environ.get("IMAGE_USER_AGENT", DEFAULT_BROWSER_UA)})
     with urllib.request.urlopen(request, timeout=180) as response:
         return response.read(), infer_extension(url, response.headers.get("Content-Type"))
 
@@ -217,7 +282,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate an image after auto-selecting an image-2 model.")
     parser.add_argument("--dry-run", action="store_true", help="Print selected model and payload without POSTing.")
     parser.add_argument("--list-models", action="store_true", help="Only GET /models and print detected IDs.")
+    parser.add_argument("--prompt", help="Override the prompt block at the bottom of the script.")
     return parser.parse_args()
+
+
+def maybe_add_env(payload: dict[str, Any], payload_key: str, env_name: str) -> None:
+    value = os.environ.get(env_name, "").strip()
+    if value:
+        payload[payload_key] = value
 
 
 def main() -> int:
@@ -238,14 +310,18 @@ def main() -> int:
 
     payload: dict[str, Any] = {
         "model": model,
-        "prompt": PROMPT.strip(),
+        "prompt": (args.prompt or PROMPT).strip(),
         "size": os.environ.get("IMAGE_SIZE", "1024x1024"),
         "n": int(os.environ.get("IMAGE_N", "1")),
     }
 
-    response_format = os.environ.get("IMAGE_RESPONSE_FORMAT", "").strip()
-    if response_format:
-        payload["response_format"] = response_format
+    maybe_add_env(payload, "quality", "IMAGE_QUALITY")
+    maybe_add_env(payload, "background", "IMAGE_BACKGROUND")
+    maybe_add_env(payload, "output_format", "IMAGE_OUTPUT_FORMAT")
+    maybe_add_env(payload, "response_format", "IMAGE_RESPONSE_FORMAT")
+    output_compression = os.environ.get("IMAGE_OUTPUT_COMPRESSION", "").strip()
+    if output_compression:
+        payload["output_compression"] = int(output_compression)
 
     if args.dry_run:
         print(json.dumps({"url": f"{base_url}/images/generations", "payload": payload}, ensure_ascii=False, indent=2))
@@ -253,7 +329,7 @@ def main() -> int:
 
     response = request_json("POST", f"{base_url}/images/generations", api_key, payload)
     output_dir = Path(os.environ.get("OUTPUT_DIR", "outputs")).expanduser()
-    saved = save_images(response, output_dir, PROMPT)
+    saved = save_images(response, output_dir, payload["prompt"])
     for path in saved:
         print(f"Saved: {path}")
     return 0
