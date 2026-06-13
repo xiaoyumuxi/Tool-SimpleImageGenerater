@@ -69,7 +69,7 @@ const renderConversations = () => {
       button.type = "button";
       button.innerHTML = `
         <span class="conversation-title"></span>
-        <span class="conversation-meta">${conversation.message_count ?? 0} 条消息 · ${formatTime(conversation.updated_at)}</span>
+        <span class="conversation-meta">${conversation.message_count ?? 0} 条记录 · ${formatTime(conversation.updated_at)}</span>
       `;
       button.querySelector(".conversation-title").textContent = conversation.title;
       button.addEventListener("click", () => loadConversation(conversation.id));
@@ -88,7 +88,7 @@ const renderMessages = () => {
     messagesEl.innerHTML = `
       <div class="empty-state">
         <span>IMG</span>
-        <h2>${state.current ? "发送第一条提示词开始生成。" : "新建一个对话，然后发送提示词。"}</h2>
+        <h2>${state.current ? "描述第一张图像。" : "今天想生成什么画面？"}</h2>
       </div>
     `;
     return;
@@ -104,7 +104,7 @@ const renderMessage = (message) => {
   article.className = `message ${message.role}`;
   const role = document.createElement("span");
   role.className = "role";
-  role.textContent = message.role === "assistant" ? "结果" : "提示词";
+  role.textContent = message.role === "assistant" ? "生成结果" : "你的提示词";
 
   const time = document.createElement("span");
   time.textContent = `${formatTime(message.created_at)}${message.model ? ` · ${message.model}` : ""}`;

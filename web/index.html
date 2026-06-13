@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Image 2 Studio</title>
+    <title>Image Studio</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -11,11 +11,14 @@
       <aside class="sidebar">
         <div class="brand">
           <div>
-            <p>Image 2</p>
-            <h1>Prompt Studio</h1>
+            <p>Image Studio</p>
+            <h1>创作工作台</h1>
           </div>
-          <button id="newConversationBtn" class="icon-btn" title="新建对话">+</button>
         </div>
+        <button id="newConversationBtn" class="sidebar-action" type="button">
+          <span>+</span>
+          新建对话
+        </button>
         <div class="search-wrap">
           <input id="searchInput" type="search" placeholder="搜索对话" />
         </div>
@@ -25,7 +28,7 @@
 
       <main class="workspace">
         <header class="topbar">
-          <input id="titleInput" class="title-input" placeholder="未选择对话" />
+          <input id="titleInput" class="title-input" placeholder="选择或新建一个创作会话" />
           <div class="topbar-actions">
             <button id="saveTitleBtn">保存标题</button>
             <button id="archiveConversationBtn" class="danger">归档对话</button>
@@ -35,14 +38,14 @@
         <section id="messages" class="messages empty">
           <div class="empty-state">
             <span>IMG</span>
-            <h2>新建一个对话，然后发送提示词。</h2>
+            <h2>今天想生成什么画面？</h2>
           </div>
         </section>
 
         <section class="composer">
-          <textarea id="promptInput" placeholder="输入或粘贴你的生成提示词"></textarea>
+          <textarea id="promptInput" placeholder="描述画面、风格、构图、光线和尺寸要求"></textarea>
           <div class="composer-footer">
-            <div id="statusText" class="status">Ready</div>
+            <div id="statusText" class="status">准备就绪</div>
             <button id="sendBtn" class="primary">生成图片</button>
           </div>
         </section>
